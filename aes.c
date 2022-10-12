@@ -3,24 +3,6 @@
 #include <stdio.h>
 #include <string.h>
 
-#define DEBUG
-#ifdef DEBUG
-void PrintState(uint8_t state[STATE_ROW_SIZE][STATE_COL_SIZE])
-{
-    for (int j = 0; j < STATE_ROW_SIZE; ++j)
-    {
-        for (int i = 0; i < STATE_COL_SIZE; ++i)
-            printf("0x%02x ", state[i][j]);
-        puts("");
-    }
-
-    puts("");
-}
-
-#else
-void PrintState(uint8_t state[STATE_ROW_SIZE][STATE_COL_SIZE]) {}
-#endif
-
 uint8_t targeted_round = 0;
 
 const uint8_t sboxtab[256] = {
@@ -75,25 +57,17 @@ void AESEncrypt(uint8_t ciphertext[DATA_SIZE], uint8_t plaintext[DATA_SIZE], uin
     uint8_t roundkeys[11][STATE_ROW_SIZE][STATE_COL_SIZE];
     KeyGen(roundkeys, master_key);
 
-    // Round 1
-    targeted_round = 1;
-    printf("Round %d\n", targeted_round);
-    PrintState(state);
+    // Round "0" (Pre-round)
+    targeted_round = 0;
     AddRoundKey(state, master_key);
 
-    // Intermediate rounds (2 - 9)
+    // Intermediate 9 rounds (1 - 9 included)
     uint8_t roundkey[STATE_ROW_SIZE][STATE_COL_SIZE];
-    for (targeted_round = 2; targeted_round <= 9; ++targeted_round)
+    for (targeted_round = 1; targeted_round <= 9; ++targeted_round)
     {
-        printf("Round %d\n", targeted_round);
-        PrintState(state);
-
         SubBytes(state);
         ShiftRows(state);
         MixColumns(state);
-
-        puts("After MixColumns");
-        PrintState(state);
 
         GetRoundKey(roundkey, roundkeys, targeted_round);
         AddRoundKey(state, roundkey);
@@ -101,7 +75,6 @@ void AESEncrypt(uint8_t ciphertext[DATA_SIZE], uint8_t plaintext[DATA_SIZE], uin
 
     // Round 10
     targeted_round = 10;
-    printf("Round %d\n", targeted_round);
     SubBytes(state);
     ShiftRows(state);
 
@@ -184,8 +157,6 @@ void KeyGen(uint8_t roundkeys[ROUND_COUNT + 1][STATE_ROW_SIZE][STATE_COL_SIZE], 
     memcpy(roundkeys[0][1], master_key[1], 4);
     memcpy(roundkeys[0][2], master_key[2], 4);
     memcpy(roundkeys[0][3], master_key[3], 4);
-
-    PrintState(roundkeys[0]);
 
     for (uint8_t i = 1; i <= 10; ++i)
     {
