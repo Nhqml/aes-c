@@ -75,7 +75,20 @@ void ShiftRows(uint8_t state[STATE_ROW_SIZE][STATE_COL_SIZE])
     state[3][0] = temp_state[3][3];
 }
 
-void MixColumns(uint8_t state[STATE_ROW_SIZE][STATE_COL_SIZE]);
+void MixColumns(uint8_t state[STATE_ROW_SIZE][STATE_COL_SIZE])
+{
+    for (uint8_t j = 0; j < STATE_COL_SIZE; ++j)
+    {
+        uint8_t col[4] = {state[0][j], state[1][j], state[2][j], state[3][j]};
+
+        MCMatrixColumnProduct(col);
+
+        state[0][j] = col[0];
+        state[1][j] = col[1];
+        state[2][j] = col[2];
+        state[3][j] = col[3];
+    }
+}
 
 void GetRoundKey(uint8_t roundkey[STATE_ROW_SIZE][STATE_COL_SIZE], uint8_t roundkeys[][STATE_ROW_SIZE][STATE_COL_SIZE], int round);
 void AddRoundKey(uint8_t state[STATE_ROW_SIZE][STATE_COL_SIZE], uint8_t roundkey[STATE_ROW_SIZE][STATE_COL_SIZE]);
@@ -90,6 +103,24 @@ void OtherColumnsFill(uint8_t roundkeys[][STATE_ROW_SIZE][STATE_COL_SIZE], int r
 void MessageToState(uint8_t state[STATE_ROW_SIZE][STATE_COL_SIZE], uint8_t message[DATA_SIZE]);
 void StateToMessage(uint8_t message[DATA_SIZE], uint8_t state[STATE_ROW_SIZE][STATE_COL_SIZE]);
 
-void MCMatrixColumnProduct(uint8_t colonne[STATE_COL_SIZE]);
+void MCMatrixColumnProduct(uint8_t colonne[STATE_COL_SIZE])
+{
+    uint8_t col_copy[] = {colonne[0], colonne[1], colonne[2], colonne[3]};
+    colonne[0] = GMul(0x2, col_copy[0]) ^ GMul(0x03, col_copy[1]) ^ col_copy[2] ^ col_copy[3];
+    colonne[1] = col_copy[0] ^ GMul(0x02, col_copy[1]) ^ GMul(0x03, col_copy[2]) ^ col_copy[3];
+    colonne[2] = col_copy[0] ^ col_copy[1] ^ GMul(0x2, col_copy[2]) ^ GMul(0x3, col_copy[3]);
+    colonne[3] = GMul(0x3, col_copy[0]) ^ col_copy[1] ^ col_copy[2] ^ GMul(0x2, col_copy[3]);
+}
 
-uint8_t gmul(uint8_t a, uint8_t b);
+uint8_t GMul(uint8_t a, uint8_t b)
+{
+    if (a == 0x2)
+        if (b < 0x80)
+            return b << 1;
+        else
+            return (0xff & (b << 1)) ^ 0x1b;
+    else if (a == 0x3)
+        return GMul(0x2, b) ^ b;
+    else // Should not reach this code
+        return 0;
+}

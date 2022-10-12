@@ -31,7 +31,8 @@ void StateToMessage(uint8_t message[DATA_SIZE], uint8_t state[STATE_ROW_SIZE][ST
 
 void MCMatrixColumnProduct(uint8_t colonne[STATE_COL_SIZE]);
 
-uint8_t gmul(uint8_t a, uint8_t b);
+// Galois field (256) multiplication of two bytes
+uint8_t GMul(uint8_t a, uint8_t b);
 
 extern const uint8_t rcon[10];
 extern const uint8_t sboxtab[256];
