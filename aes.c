@@ -1,6 +1,27 @@
 #include "aes.h"
 
+#include <stdio.h>
 #include <string.h>
+
+#define DEBUG
+#ifdef DEBUG
+void PrintState(uint8_t state[STATE_ROW_SIZE][STATE_COL_SIZE])
+{
+    for (int j = 0; j < STATE_ROW_SIZE; ++j)
+    {
+        for (int i = 0; i < STATE_COL_SIZE; ++i)
+            printf("0x%02x ", state[i][j]);
+        puts("");
+    }
+
+    puts("");
+}
+
+#else
+void PrintState(uint8_t state[STATE_ROW_SIZE][STATE_COL_SIZE]) {}
+#endif
+
+uint8_t targeted_round = 0;
 
 const uint8_t sboxtab[256] = {
     0x63, 0x7c, 0x77, 0x7b, 0xf2, 0x6b, 0x6f, 0xc5, 0x30, 0x01, 0x67, 0x2b, 0xfe, 0xd7, 0xab, 0x76,
@@ -38,70 +59,179 @@ const uint8_t invsbox[256] = {
     0xa0, 0xe0, 0x3b, 0x4d, 0xae, 0x2a, 0xf5, 0xb0, 0xc8, 0xeb, 0xbb, 0x3c, 0x83, 0x53, 0x99, 0x61,
     0x17, 0x2b, 0x04, 0x7e, 0xba, 0x77, 0xd6, 0x26, 0xe1, 0x69, 0x14, 0x63, 0x55, 0x21, 0x0c, 0x7d};
 
-void AESEncrypt(uint8_t ciphertext[DATA_SIZE], uint8_t plaintext[DATA_SIZE], uint8_t key[DATA_SIZE]);
+const uint8_t rcon[10] = {0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1b, 0x36};
+
+void AESEncrypt(uint8_t ciphertext[DATA_SIZE], uint8_t plaintext[DATA_SIZE], uint8_t key[DATA_SIZE])
+{
+    // Convert key to matrix
+    uint8_t master_key[STATE_ROW_SIZE][STATE_COL_SIZE];
+    MessageToState(master_key, key);
+
+    // Convert message to matrix (state)
+    uint8_t state[STATE_ROW_SIZE][STATE_COL_SIZE];
+    MessageToState(state, plaintext);
+
+    // Generate all round keys
+    uint8_t roundkeys[11][STATE_ROW_SIZE][STATE_COL_SIZE];
+    KeyGen(roundkeys, master_key);
+
+    // Round 1
+    targeted_round = 1;
+    AddRoundKey(state, master_key);
+
+    // Intermediate rounds (2 - 9)
+    uint8_t roundkey[STATE_ROW_SIZE][STATE_COL_SIZE];
+    for (targeted_round = 2; targeted_round <= 9; ++targeted_round)
+    {
+        SubBytes(state);
+        ShiftRows(state);
+        MixColumns(state);
+
+        GetRoundKey(roundkey, roundkeys, targeted_round);
+        AddRoundKey(state, roundkey);
+    }
+
+    // Round 10
+    targeted_round = 10;
+    SubBytes(state);
+    ShiftRows(state);
+
+    GetRoundKey(roundkey, roundkeys, targeted_round);
+    AddRoundKey(state, roundkey);
+
+    // Convert back to message
+    StateToMessage(ciphertext, state);
+}
 
 void SubBytes(uint8_t state[STATE_ROW_SIZE][STATE_COL_SIZE])
 {
-    for (uint8_t i = 0; i < STATE_ROW_SIZE; ++i)
-        for (uint8_t j = 0; j < STATE_COL_SIZE; ++j)
+    for (uint8_t i = 0; i < STATE_COL_SIZE; ++i)
+        for (uint8_t j = 0; j < STATE_ROW_SIZE; ++j)
             state[i][j] = sboxtab[state[i][j]];
 }
 
 void ShiftRows(uint8_t state[STATE_ROW_SIZE][STATE_COL_SIZE])
 {
     uint8_t temp_state[STATE_ROW_SIZE][STATE_COL_SIZE];
-    for (uint8_t i = 0; i < STATE_ROW_SIZE; ++i)
+    for (uint8_t i = 0; i < STATE_COL_SIZE; ++i)
         memcpy(temp_state[i], state[i], STATE_COL_SIZE);
 
     // 1st
-    state[1][3] = temp_state[1][0];
+    state[3][1] = temp_state[0][1];
 
-    state[1][0] = temp_state[1][1];
-    state[1][1] = temp_state[1][2];
-    state[1][2] = temp_state[1][3];
+    state[0][1] = temp_state[1][1];
+    state[1][1] = temp_state[2][1];
+    state[2][1] = temp_state[3][1];
 
     // 2nd
-    state[2][2] = temp_state[2][0];
-    state[2][3] = temp_state[2][1];
+    state[2][2] = temp_state[0][2];
+    state[3][2] = temp_state[1][2];
 
-    state[2][0] = temp_state[2][2];
-    state[2][1] = temp_state[2][3];
+    state[0][2] = temp_state[2][2];
+    state[1][2] = temp_state[3][2];
 
     // 3rd
-    state[3][1] = temp_state[3][0];
-    state[3][2] = temp_state[3][1];
-    state[3][3] = temp_state[3][2];
+    state[1][3] = temp_state[0][3];
+    state[2][3] = temp_state[1][3];
+    state[3][3] = temp_state[2][3];
 
-    state[3][0] = temp_state[3][3];
+    state[0][3] = temp_state[3][3];
 }
 
 void MixColumns(uint8_t state[STATE_ROW_SIZE][STATE_COL_SIZE])
 {
-    for (uint8_t j = 0; j < STATE_COL_SIZE; ++j)
+    for (uint8_t j = 0; j < STATE_ROW_SIZE; ++j)
     {
-        uint8_t col[4] = {state[0][j], state[1][j], state[2][j], state[3][j]};
+        uint8_t col[4] = {state[j][0], state[j][1], state[j][2], state[j][3]};
 
         MCMatrixColumnProduct(col);
 
-        state[0][j] = col[0];
-        state[1][j] = col[1];
-        state[2][j] = col[2];
-        state[3][j] = col[3];
+        state[j][0] = col[0];
+        state[j][1] = col[1];
+        state[j][2] = col[2];
+        state[j][3] = col[3];
     }
 }
 
-void GetRoundKey(uint8_t roundkey[STATE_ROW_SIZE][STATE_COL_SIZE], uint8_t roundkeys[][STATE_ROW_SIZE][STATE_COL_SIZE], int round);
-void AddRoundKey(uint8_t state[STATE_ROW_SIZE][STATE_COL_SIZE], uint8_t roundkey[STATE_ROW_SIZE][STATE_COL_SIZE]);
+void GetRoundKey(uint8_t roundkey[STATE_ROW_SIZE][STATE_COL_SIZE], uint8_t roundkeys[ROUND_COUNT + 1][STATE_ROW_SIZE][STATE_COL_SIZE], int round)
+{
+    memcpy(roundkey, roundkeys[round], 4);
+    memcpy(roundkey, roundkeys[round] + 4, 4);
+    memcpy(roundkey, roundkeys[round] + 8, 4);
+    memcpy(roundkey, roundkeys[round] + 12, 4);
+}
 
-void KeyGen(uint8_t roundkeys[][STATE_ROW_SIZE][STATE_COL_SIZE], uint8_t master_key[STATE_ROW_SIZE][STATE_COL_SIZE]);
+void AddRoundKey(uint8_t state[STATE_ROW_SIZE][STATE_COL_SIZE], uint8_t roundkey[STATE_ROW_SIZE][STATE_COL_SIZE])
+{
+    for (uint8_t i = 0; i < STATE_COL_SIZE; ++i)
+        for (uint8_t j = 0; j < STATE_ROW_SIZE; ++j)
+            state[i][j] ^= roundkey[i][j];
+}
 
-// fill the first column of a given round key
-void ColumnFill(uint8_t roundkeys[][STATE_ROW_SIZE][STATE_COL_SIZE], int round);
-// fill the other 3 columns of a given round key
-void OtherColumnsFill(uint8_t roundkeys[][STATE_ROW_SIZE][STATE_COL_SIZE], int round);
+void KeyGen(uint8_t roundkeys[ROUND_COUNT + 1][STATE_ROW_SIZE][STATE_COL_SIZE], uint8_t master_key[STATE_ROW_SIZE][STATE_COL_SIZE])
+{
+    // Copy master key to roundkeys[0]
+    memcpy(roundkeys[0][0], master_key[0], 4);
+    memcpy(roundkeys[0][1], master_key[1], 4);
+    memcpy(roundkeys[0][2], master_key[2], 4);
+    memcpy(roundkeys[0][3], master_key[3], 4);
 
-void MessageToState(uint8_t state[STATE_ROW_SIZE][STATE_COL_SIZE], uint8_t message[DATA_SIZE]);
-void StateToMessage(uint8_t message[DATA_SIZE], uint8_t state[STATE_ROW_SIZE][STATE_COL_SIZE]);
+    PrintState(roundkeys[0]);
+
+    for (uint8_t i = 1; i <= 10; ++i)
+    {
+        ColumnFill(roundkeys, i);
+        OtherColumnsFill(roundkeys, i);
+    }
+}
+
+void ColumnFill(uint8_t roundkeys[ROUND_COUNT + 1][STATE_ROW_SIZE][STATE_COL_SIZE], int round)
+{
+    // RotWord
+    uint8_t tmp = roundkeys[round - 1][3][0];
+    roundkeys[round][0][0] = roundkeys[round - 1][3][1];
+    roundkeys[round][0][1] = roundkeys[round - 1][3][2];
+    roundkeys[round][0][2] = roundkeys[round - 1][3][3];
+    roundkeys[round][0][3] = tmp;
+
+    // SubBytes/SubWord
+    for (uint8_t j = 0; j < STATE_COL_SIZE; ++j)
+        roundkeys[round][0][j] = sboxtab[roundkeys[round][0][j]];
+
+    // XOR with Wi-4 and Rcon
+    roundkeys[round][0][0] = roundkeys[round - 1][0][0] ^ roundkeys[round][0][0] ^ rcon[round - 1];
+    roundkeys[round][0][1] = roundkeys[round - 1][0][1] ^ roundkeys[round][0][1] ^ 0x00;
+    roundkeys[round][0][2] = roundkeys[round - 1][0][2] ^ roundkeys[round][0][2] ^ 0x00;
+    roundkeys[round][0][3] = roundkeys[round - 1][0][3] ^ roundkeys[round][0][3] ^ 0x00;
+}
+
+void OtherColumnsFill(uint8_t roundkeys[ROUND_COUNT + 1][STATE_ROW_SIZE][STATE_COL_SIZE], int round)
+{
+    for (uint8_t i = 1; i <= 3; ++i)
+    {
+        // XOR Wi-1 and Wi-4
+        roundkeys[round][i][0] = roundkeys[round][i - 1][0] ^ roundkeys[round - 1][i][0];
+        roundkeys[round][i][1] = roundkeys[round][i - 1][1] ^ roundkeys[round - 1][i][1];
+        roundkeys[round][i][2] = roundkeys[round][i - 1][2] ^ roundkeys[round - 1][i][2];
+        roundkeys[round][i][3] = roundkeys[round][i - 1][3] ^ roundkeys[round - 1][i][3];
+    }
+}
+
+void MessageToState(uint8_t state[STATE_ROW_SIZE][STATE_COL_SIZE], uint8_t message[DATA_SIZE])
+{
+    memcpy(state[0], message, 4);
+    memcpy(state[1], message + 4, 4);
+    memcpy(state[2], message + 8, 4);
+    memcpy(state[3], message + 12, 4);
+}
+
+void StateToMessage(uint8_t message[DATA_SIZE], uint8_t state[STATE_ROW_SIZE][STATE_COL_SIZE])
+{
+    memcpy(message, state[0], 4);
+    memcpy(message + 4, state[1], 4);
+    memcpy(message + 8, state[2], 4);
+    memcpy(message + 12, state[3], 4);
+}
 
 void MCMatrixColumnProduct(uint8_t colonne[STATE_COL_SIZE])
 {
