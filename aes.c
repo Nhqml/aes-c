@@ -77,15 +77,23 @@ void AESEncrypt(uint8_t ciphertext[DATA_SIZE], uint8_t plaintext[DATA_SIZE], uin
 
     // Round 1
     targeted_round = 1;
+    printf("Round %d\n", targeted_round);
+    PrintState(state);
     AddRoundKey(state, master_key);
 
     // Intermediate rounds (2 - 9)
     uint8_t roundkey[STATE_ROW_SIZE][STATE_COL_SIZE];
     for (targeted_round = 2; targeted_round <= 9; ++targeted_round)
     {
+        printf("Round %d\n", targeted_round);
+        PrintState(state);
+
         SubBytes(state);
         ShiftRows(state);
         MixColumns(state);
+
+        puts("After MixColumns");
+        PrintState(state);
 
         GetRoundKey(roundkey, roundkeys, targeted_round);
         AddRoundKey(state, roundkey);
@@ -93,6 +101,7 @@ void AESEncrypt(uint8_t ciphertext[DATA_SIZE], uint8_t plaintext[DATA_SIZE], uin
 
     // Round 10
     targeted_round = 10;
+    printf("Round %d\n", targeted_round);
     SubBytes(state);
     ShiftRows(state);
 
@@ -155,10 +164,10 @@ void MixColumns(uint8_t state[STATE_ROW_SIZE][STATE_COL_SIZE])
 
 void GetRoundKey(uint8_t roundkey[STATE_ROW_SIZE][STATE_COL_SIZE], uint8_t roundkeys[ROUND_COUNT + 1][STATE_ROW_SIZE][STATE_COL_SIZE], int round)
 {
-    memcpy(roundkey, roundkeys[round], 4);
-    memcpy(roundkey, roundkeys[round] + 4, 4);
-    memcpy(roundkey, roundkeys[round] + 8, 4);
-    memcpy(roundkey, roundkeys[round] + 12, 4);
+    memcpy(roundkey[0], roundkeys[round][0], 4);
+    memcpy(roundkey[1], roundkeys[round][1], 4);
+    memcpy(roundkey[2], roundkeys[round][2], 4);
+    memcpy(roundkey[3], roundkeys[round][3], 4);
 }
 
 void AddRoundKey(uint8_t state[STATE_ROW_SIZE][STATE_COL_SIZE], uint8_t roundkey[STATE_ROW_SIZE][STATE_COL_SIZE])
