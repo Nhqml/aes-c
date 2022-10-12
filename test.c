@@ -2,8 +2,6 @@
 
 #include "aes.h"
 
-#define DEBUG
-#ifdef DEBUG
 void PrintState(uint8_t state[STATE_ROW_SIZE][STATE_COL_SIZE])
 {
     for (int j = 0; j < STATE_ROW_SIZE; ++j)
@@ -26,10 +24,6 @@ void PrintMessage(uint8_t message[DATA_SIZE], char *text)
 
     puts("\n");
 }
-#else
-void PrintState(uint8_t state[STATE_ROW_SIZE][STATE_COL_SIZE]) {}
-void PrintMessage(uint8_t message[DATA_SIZE], char *text) {}
-#endif
 
 int main(void)
 {
@@ -46,6 +40,10 @@ int main(void)
     AESEncrypt(encrypted, message, master_key);
 
     PrintMessage(encrypted, "Encrypted:  ");
+
+    AESDecrypt(encrypted, message, master_key);
+
+    PrintMessage(encrypted, "Decrypted:  ");
 
     return 0;
 }

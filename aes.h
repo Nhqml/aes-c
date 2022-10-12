@@ -11,10 +11,14 @@
 extern uint8_t targeted_round;
 
 void AESEncrypt(uint8_t ciphertext[DATA_SIZE], uint8_t plaintext[DATA_SIZE], uint8_t key[DATA_SIZE]);
+void AESDecrypt(uint8_t plaintext[DATA_SIZE], uint8_t ciphertext[DATA_SIZE], uint8_t key[DATA_SIZE]);
 
 void SubBytes(uint8_t state[STATE_ROW_SIZE][STATE_COL_SIZE]);
+void InvSubBytes(uint8_t state[STATE_ROW_SIZE][STATE_COL_SIZE]);
 void ShiftRows(uint8_t state[STATE_ROW_SIZE][STATE_COL_SIZE]);
+void InvShiftRows(uint8_t state[STATE_ROW_SIZE][STATE_COL_SIZE]);
 void MixColumns(uint8_t state[STATE_ROW_SIZE][STATE_COL_SIZE]);
+void InvMixColumns(uint8_t state[STATE_ROW_SIZE][STATE_COL_SIZE]);
 
 void GetRoundKey(uint8_t roundkey[STATE_ROW_SIZE][STATE_COL_SIZE], uint8_t roundkeys[ROUND_COUNT + 1][STATE_ROW_SIZE][STATE_COL_SIZE], int round);
 void AddRoundKey(uint8_t state[STATE_ROW_SIZE][STATE_COL_SIZE], uint8_t roundkey[STATE_ROW_SIZE][STATE_COL_SIZE]);
@@ -31,10 +35,11 @@ void MessageToState(uint8_t state[STATE_ROW_SIZE][STATE_COL_SIZE], uint8_t messa
 void StateToMessage(uint8_t message[DATA_SIZE], uint8_t state[STATE_ROW_SIZE][STATE_COL_SIZE]);
 
 void MCMatrixColumnProduct(uint8_t colonne[STATE_COL_SIZE]);
+void IMCMatrixColumnProduct(uint8_t colonne[STATE_COL_SIZE]);
 
 // Galois field (256) multiplication of two bytes
 uint8_t GMul(uint8_t a, uint8_t b);
 
 extern const uint8_t rcon[10];
 extern const uint8_t sboxtab[256];
-extern const uint8_t invsbox[256];
+extern const uint8_t invsboxtab[256];
