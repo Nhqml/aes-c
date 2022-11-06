@@ -33,19 +33,42 @@ void PrintMessage(uint8_t message[DATA_SIZE], char *text) {}
 
 int main(void)
 {
-    uint8_t master_key[DATA_SIZE] = {0x2b, 0x7e, 0x15, 0x16, 0x28, 0xae, 0xd2, 0xa6, 0xab, 0xf7, 0x15, 0x88, 0x09, 0xcf, 0x4f, 0x3c};
-
-    PrintMessage(master_key, "Master key: ");
-
-    uint8_t message[DATA_SIZE] = {0x32, 0x43, 0xf6, 0xa8, 0x88, 0x5a, 0x30, 0x8d, 0x31, 0x31, 0x98, 0xa2, 0xe0, 0x37, 0x07, 0x34};
-
+    // Le state est le message écrit en colonne
+    uint8_t message[DATA_SIZE] = {0x1f, 0xc9, 0xe1, 0xb9, 0x9c, 0x80, 0x0a, 0x81, 0x01, 0x28, 0xb8, 0x03, 0x67, 0x3c, 0x0f, 0xeb};
     PrintMessage(message, "Message:    ");
 
-    uint8_t encrypted[DATA_SIZE];
+    uint8_t state[STATE_ROW_SIZE][STATE_COL_SIZE];
+    MessageToState(state, message);
 
-    AESEncrypt(encrypted, message, master_key);
+    puts("State");
+    PrintState(state);
 
-    PrintMessage(encrypted, "Encrypted:  ");
+    SubBytes(state);
+    puts("SubBytes");
+    PrintState(state);
+
+    ShiftRows(state);
+    puts("ShiftRows");
+    PrintState(state);
+
+    MixColumns(state);
+    puts("MixColumns");
+    PrintState(state);
+
+    puts("============================");
+    puts("MixColumns formulas");
+    puts("\
+|a'| = |02 03 01 01| |a|\n\
+|b'|   |01 02 03 01| |b|\n\
+|c'|   |01 01 02 03| |c|\n\
+|d'|   |03 01 01 02| |d|");
+    puts("\
+Les + sont des XOR !\n\
+a' = 02 * a + 03 * b + c + d\n\
+b' = a + 02 * b + 03 * c + d\n\
+c' = a + b + 02 * c + 03 * d\n\
+d' = 03 * a + b + c + 02 * d");
+    puts("============================");
 
     return 0;
 }
